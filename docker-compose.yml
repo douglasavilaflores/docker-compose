@@ -1,0 +1,104 @@
+version: "1.0"
+services:
+  db:
+    image: mariadb
+    container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+    networks:
+    - rededev
+    volumes:
+    - ./db:/var/lib/mysql
+    restart: unless-stopped
+  php:
+    image: php:7-fpm
+    container_name: php
+    networks:
+    - rededev
+    volumes:
+    - conf-php:/usr/local/etc/php
+    - conf-php-fpm:/usr/local/etc/php-fpm.d
+    - www-data:/var/www/html
+    command:
+    - /bin/sh
+    - -c
+    - |
+        docker-php-ext-install mysqli 
+        echo "Extension installed. Starting php-fpm."
+        php-fpm
+  apache:
+    image: ubuntu/apache2:2.4-20.04_beta
+    container_name: apache
+    ports:
+    - 80:80
+    - 443:443
+    restart: unless-stopped
+    command:
+    - /bin/sh
+    - -c
+    - |
+        a2enmod proxy
+        a2enmod proxy_fcgi
+        a2ensite 000-default
+        apache2-foreground
+    networks:
+    - rededev
+    volumes:
+    - conf-apache-sites:/etc/apache2/sites-available
+    - log-apache:/var/log/apache2
+    - www-data:/var/www/html
+    depends_on:
+    - "db"
+    - "php"
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    ports:
+    - 8000:80
+    environment:
+      PMA_ARBITRARY: 1
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root
+    networks:
+    - rededev
+volumes:
+  conf-apache-sites:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './conf/apache/sites-available'
+
+  conf-php:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './conf/php'
+
+  conf-php-fpm:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './conf/php-fpm'
+
+  log-apache:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './log/apache'
+
+  www-data:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './html'
+
+networks:
+  rededev:
